@@ -1,32 +1,31 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+type Health = { ok: boolean } | { error: string };
 
 export default function Home() {
-  const [result, setResult] = useState<any>(null);
-  const [err, setErr] = useState<string>("");
+  const [data, setData] = useState<Health | null>(null);
 
-  const ping = async () => {
-    setErr("");
-    setResult(null);
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/health`);
-      const data = await res.json();
-      setResult(data);
-    } catch (e: any) {
-      setErr(String(e));
-    }
-  };
+  useEffect(() => {
+    const run = async () => {
+      try {
+        const res = await fetch("https://antique-pricer.onrender.com/health", {
+          method: "GET",
+          credentials: "include",
+        });
+        const json = (await res.json()) as Health;
+        setData(json);
+      } catch (e) {
+        setData({ error: "Failed to fetch" });
+      }
+    };
+    run();
+  }, []);
 
   return (
-    <main style={{ maxWidth: 680, margin: "40px auto", padding: "0 16px" }}>
-      <h1>Antique Pricer (MVP)</h1>
-      <button onClick={ping}>Ping API</button>
-      {result && (
-        <pre style={{ marginTop: 16, background: "#f6f6f6", padding: 12 }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
-      )}
-      {err && <p style={{ color: "crimson" }}>{err}</p>}
+    <main style={{ padding: "2rem", fontFamily: "sans-serif" }}>
+      <h1>Backend Connection Test</h1>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
     </main>
   );
 }
