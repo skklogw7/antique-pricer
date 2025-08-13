@@ -1,0 +1,11 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.env
+
+apps/frontend/.next/
+appls/frontend/node_modules/
+
+.vscode/
+.idea/
