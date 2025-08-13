@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, FormEvent } from "react";
 
 type ValueRange = { low: number; high: number; confidence: string };
@@ -16,18 +17,30 @@ type EstimateResponse = {
   duration_ms: number;
 };
 
+function isEstimateResponse(x: unknown): x is EstimateResponse {
+  if (!x || typeof x !== "object") return false;
+  const o = x as Record<string, unknown>;
+  return (
+    typeof o.normalized_title === "string" &&
+    typeof o.value_range === "object" &&
+    Array.isArray(o.pricing_rationale) &&
+    Array.isArray(o.comps)
+  );
+}
+
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [category, setCategory] = useState("not_sure");
   const [notes, setNotes] = useState("");
   const [resJson, setResJson] = useState<EstimateResponse | null>(null);
-  const [err, setErr] = useState("");
+  const [err, setErr] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (ev: FormEvent) => {
+    ev.preventDefault();
     setErr("");
     setResJson(null);
+
     if (!file) {
       setErr("Please choose an image.");
       return;
@@ -36,6 +49,7 @@ export default function Home() {
       setErr("Image too large (max 10MB).");
       return;
     }
+
     setLoading(true);
     try {
       const fd = new FormData();
@@ -47,13 +61,20 @@ export default function Home() {
         method: "POST",
         body: fd,
       });
-      const data: EstimateResponse | { error: string } = await r.json();
-      if (!r.ok || (data as any).error) {
-        setErr((data as any).error || `Request failed (${r.status})`);
-      } else {
-        setResJson(data as EstimateResponse);
+      const data: unknown = await r.json();
+
+      if (!r.ok) {
+        const msg = (data as { error?: string } | null)?.error ?? `Request failed (${r.status})`;
+        setErr(msg);
+        return;
       }
-    } catch (e) {
+
+      if (isEstimateResponse(data)) {
+        setResJson(data);
+      } else {
+        setErr("Unexpected response format.");
+      }
+    } catch {
       setErr("Network error. Try again.");
     } finally {
       setLoading(false);
@@ -63,8 +84,10 @@ export default function Home() {
   return (
     <main style={{ maxWidth: 820, margin: "40px auto", padding: "0 16px", fontFamily: "system-ui, sans-serif" }}>
       <h1 style={{ marginBottom: 12 }}>Antique Pricer (MVP)</h1>
+
       <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
         <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+
         <label>
           Category:&nbsp;
           <select value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -75,6 +98,7 @@ export default function Home() {
             <option value="collectible">Collectible</option>
           </select>
         </label>
+
         <textarea
           placeholder="Notes (e.g., dimensions, maker’s mark, condition)"
           value={notes}
@@ -82,9 +106,11 @@ export default function Home() {
           rows={3}
           style={{ resize: "vertical" }}
         />
+
         <button disabled={!file || loading} style={{ padding: "8px 12px" }}>
           {loading ? "Estimating..." : "Get value"}
         </button>
+
         {err && <div style={{ color: "crimson" }}>{err}</div>}
       </form>
 
@@ -92,17 +118,24 @@ export default function Home() {
         <section style={{ marginTop: 24, padding: 16, border: "1px solid #eee", borderRadius: 8 }}>
           <h3 style={{ marginTop: 0 }}>{resJson.normalized_title}</h3>
           <p>
-            <strong>${resJson.value_range.low}–${resJson.value_range.high}</strong> ({resJson.value_range.confidence})
+            <strong>
+              ${resJson.value_range.low}–${resJson.value_range.high}
+            </strong>{" "}
+            ({resJson.value_range.confidence})
           </p>
+
           {resJson.image_url && (
+            // Using <img> keeps things simple; this warning doesn't break builds
             <img src={resJson.image_url} alt="Uploaded item" style={{ maxWidth: 320, borderRadius: 6, border: "1px solid #ddd" }} />
           )}
+
           <h4>Why this range</h4>
           <ul>
             {resJson.pricing_rationale.map((r, i) => (
               <li key={i}>{r}</li>
             ))}
           </ul>
+
           <h4>Comps</h4>
           <ul>
             {resJson.comps.map((c, i) => (
@@ -114,7 +147,15 @@ export default function Home() {
               </li>
             ))}
           </ul>
-          <button onClick={() => { setFile(null); setResJson(null); setNotes(""); }} style={{ marginTop: 12 }}>
+
+          <button
+            onClick={() => {
+              setFile(null);
+              setResJson(null);
+              setNotes("");
+            }}
+            style={{ marginTop: 12 }}
+          >
             Price another item
           </button>
         </section>
